@@ -55,7 +55,10 @@ const getBase = (appId: string): Configuration => ({
   extraMetadata: {
     desktopName: `${appId}.desktop`,
   },
-  files: ["out/**/*", "resources/**/*", "!resources/opencode-cli*"],
+  files: ["out/**/*", "resources/**/*"],
+  // The server bundle + its wasm assets are loaded at runtime via the Node ESM
+  // loader / fs reads and must live on the real filesystem, not inside the asar.
+  asarUnpack: ["out/main/opencode-server.mjs", "out/main/*.wasm"],
   extraResources: [
     ...(channel === "dev"
       ? [

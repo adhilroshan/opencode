@@ -15,6 +15,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import { Plugin } from "@/plugin"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { McpLazyActivation } from "@/session/mcp-lazy"
 import { Effect, Layer, Schema } from "effect"
 import { testEffect } from "../lib/effect"
 
@@ -66,6 +67,13 @@ const layer = Layer.mergeAll(
   Layer.succeed(Permission.Service, fakePermission),
   Layer.succeed(MCP.Service, fakeMcp()),
   Layer.succeed(Truncate.Service, fakeTruncate),
+  Layer.succeed(
+    McpLazyActivation.Service,
+    McpLazyActivation.Service.of({
+      get: () => Effect.succeed(new Set<string>()),
+      add: () => Effect.void,
+    }),
+  ),
   RuntimeFlags.layer(),
   Layer.succeed(
     ToolRegistry.Service,
