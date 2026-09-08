@@ -15,7 +15,7 @@ Integrate the Teams core, background-subagent, and Dynamic Workflows features in
 
 ## Architecture
 
-Teams will be ported first because its persistence and lifecycle events are foundational. Its startup recovery and cleanup hooks will be attached to the current `InstanceBootstrap` Effect service and gated through the current runtime flag service. Background subagents will then be reconciled with the current session prompt and event APIs. Dynamic Workflows will be ported last, including server, plugin, SDK, and TUI surfaces only where the current tree has matching extension points.
+Teams will be ported first because its persistence and lifecycle events are foundational. Its startup recovery and cleanup hooks will be attached to the current `InstanceBootstrap` Effect service (ungated — see Amendment below; there is no Teams runtime flag). Background subagents will then be reconciled with the current session prompt and event APIs. Dynamic Workflows will be ported last, including server, plugin, SDK, and TUI surfaces only where the current tree has matching extension points.
 
 Historical PR code may be copied selectively, but imports, flags, lifecycle wiring, generated artifacts, and tests must follow the current tree. If a PR depends on an interface removed from `dev`, the port will use the current replacement or record the feature as blocked rather than reintroducing obsolete architecture.
 
