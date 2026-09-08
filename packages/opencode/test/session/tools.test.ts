@@ -70,8 +70,8 @@ const layer = Layer.mergeAll(
   Layer.succeed(
     McpLazyActivation.Service,
     McpLazyActivation.Service.of({
-      get: () => Effect.succeed(new Set<string>()),
-      add: () => Effect.void,
+      get: (_sessionID) => Effect.succeed(new Set<string>()),
+      add: (_sessionID, _keys) => Effect.void,
     }),
   ),
   RuntimeFlags.layer(),

@@ -3088,17 +3088,17 @@ export async function run(_args, ctx) { return await ctx.workflow("bad-child") }
 
       const run = yield* workflow.start({ name: PARALLEL_HANG_FIXTURE, args: {}, prompt: ops })
 
-      // Warten bis alle drei parallelen Agenten ihre Child-Session registriert haben.
+      // Wait until all expected parallel agents registered their child session.
       const live = yield* pollWithTimeout(
         Effect.gen(function* () {
           const current = yield* workflow.get(run.id)
           const running = current?.agents.filter((a) => a.status === "running" && a.session_id) ?? []
-           return running.length >= expected ? current : undefined
+          return running.length >= expected ? current : undefined
         }),
         "parallel agents never all started",
       )
       const sessions = live!.agents.map((a) => a.session_id!).filter(Boolean)
-       expect(sessions.length).toBeGreaterThanOrEqual(expected)
+      expect(sessions.length).toBeGreaterThanOrEqual(expected)
 
       yield* workflow.cancel(run.id)
 
@@ -3795,9 +3795,9 @@ export async function run(args, ctx) { ctx.setPhase("run"); return { value: args
   // together via ctx.parallel all pass the gate while the budget is still positive,
   // so a run can OVERSPEND by the combined cost of the steps already in flight when
   // the budget runs out — documented soft-cap behavior, not a hard mid-step limit.
-  // Deterministic proof: a Deferred barrier holds all 3 parallel prompts until ALL
+  // Deterministic proof: a Deferred barrier holds all parallel prompts until ALL
   // have passed the gate, then releases them so they all charge. With budget 1.0 and
-  // 3 parallel steps à 0.5 (total 1.5), the budget overspends to -0.5; the NEXT
+  // parallel steps costing 1.5 in total, the budget overspends to -0.5; the NEXT
   // (sequential) step then fails the exhausted-budget gate.
   it.instance("parallel steps all pass the gate and overspend; the next step fails (soft cap)", () =>
     Effect.gen(function* () {
@@ -3807,31 +3807,31 @@ export async function run(args, ctx) { ctx.setPhase("run"); return { value: args
       const { db } = yield* Database.Service
       const parallelCount = Math.min(3, Math.min(16, Math.max(2, os.cpus().length - 2)))
       const parallelCost = 1.5 / parallelCount
-      // 3 parallel agents à 0.5 USD, budget 1.0. All 3 pass the gate while the
-      // budget is positive (the barrier holds them until all 3 have arrived), so
-      // all 3 charge ⇒ overspend to -0.5.
+      // Parallel agents costing parallelCost each, budget 1.0. All pass the gate while
+      // the budget is positive (the barrier holds them until all have arrived), so
+      // all charge ⇒ overspend to -0.5.
       const run = yield* workflow.start({
         name: BUDGET_PARALLEL_FIXTURE,
-         args: { count: parallelCount },
-         prompt: budgetBarrierPromptOps(db, parallelCost, parallelCount),
+        args: { count: parallelCount },
+        prompt: budgetBarrierPromptOps(db, parallelCost, parallelCount),
         budget: 1,
       })
       const done = yield* workflow.wait({ id: run.id })
       // The run COMPLETES — the workflow body catches the post-batch budget failure.
       expect(done.run?.status).toBe("completed")
       const result = done.run?.result as { overspent: number; nextStarted: boolean; nextFailed: boolean }
-      // Soft-cap overspend: all 3 parallel steps charged, driving the budget below 0.
+      // Soft-cap overspend: all parallel steps charged, driving the budget below 0.
       expect(result.overspent).toBeCloseTo(-0.5, 10)
-      // All 3 parallel steps were charged (completed) — the documented overspend.
+      // All parallel steps were charged (completed) — the documented overspend.
       const completed = done.run?.agents.filter((a) => a.status === "completed") ?? []
-       expect(completed.length).toBe(parallelCount)
+      expect(completed.length).toBe(parallelCount)
       const totalCost = completed.reduce((sum, a) => sum + (a.cost ?? 0), 0)
-       expect(totalCost).toBeCloseTo(1.5, 10)
+      expect(totalCost).toBeCloseTo(1.5, 10)
       // The NEXT (sequential) step after exhaustion hits the gate and fails.
       expect(result.nextStarted).toBe(true)
       expect(result.nextFailed).toBe(true)
-      // The blocked 4th step never created a node (refused before dispatch).
-       expect(done.run?.agents.length).toBe(parallelCount)
+      // The refused follow-up step never created a node (refused before dispatch).
+      expect(done.run?.agents.length).toBe(parallelCount)
     }),
   )
 

@@ -19,6 +19,10 @@ Teams will be ported first because its persistence and lifecycle events are foun
 
 Historical PR code may be copied selectively, but imports, flags, lifecycle wiring, generated artifacts, and tests must follow the current tree. If a PR depends on an interface removed from `dev`, the port will use the current replacement or record the feature as blocked rather than reintroducing obsolete architecture.
 
+## Amendment (review finding): Teams ships ungated
+
+The ported Teams implementation (from upstream PR `#39523`) registers `team_create`/`team_status`/`team_spawn`/`team_message`/`team_task` unconditionally via its Layer node, with the `/api/team` routes and sidebar always live — there is no `OPENCODE_EXPERIMENTAL_*` runtime flag for it. Gating it would mean threading `RuntimeFlags` through core tool registration, server routes, and app UI: a new feature that diverges from upstream, out of scope for an integration port. Decision: ship Teams always-on as upstream designed it. If a flag becomes desirable, it is follow-up work. Cost if wrong: `team_spawn` (session-spawning surface) is exposed without an experimental opt-in.
+
 ## Verification
 
 Each feature must compile and pass its focused tests before its commit. The final gate is `bun turbo typecheck`, the full `packages/opencode` test suite, and `bun dev --help`. Build output is verified with the native Linux single-binary build; Windows deployment remains a user-side operation.
