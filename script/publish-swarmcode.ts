@@ -36,7 +36,23 @@ if (mode !== "pack" && mode !== "publish") {
 }
 
 async function published(name: string, version: string) {
-  return (await $`npm view ${name}@${version} version`.nothrow()).exitCode === 0
+  return (await $`npm view ${name}@${version} version --prefer-online`.nothrow()).exitCode === 0
+}
+
+async function publishTgz(tgz: string, name: string, cwd?: string) {
+  try {
+    if (cwd) await $`npm publish ${tgz} --access public --tag ${TAG}`.cwd(cwd)
+    else await $`npm publish ${tgz} --access public --tag ${TAG}`
+    console.log(`published ${name}@${VERSION}`)
+  } catch (e) {
+    const err = e as { stderr?: unknown }
+    const text = [err.stderr, e].map(String).join("\n")
+    if (text.includes("previously published versions")) {
+      console.log(`already published ${name}@${VERSION}`)
+      return
+    }
+    throw e
+  }
 }
 
 function forkName(upstream: string) {
@@ -99,8 +115,7 @@ if (mode === "publish") {
       console.log(`already published ${name}@${VERSION}`)
       continue
     }
-    await $`npm publish ${path.join(STAGE, tgz)} --access public --tag ${TAG}`
-    console.log(`published ${name}@${VERSION}`)
+    await publishTgz(path.join(STAGE, tgz), name)
   }
 
   // --- meta package ---
@@ -156,7 +171,6 @@ if (mode === "publish") {
     await $`bun pm pack`.cwd(metaDir)
     const metaTgz = (await Array.fromAsync(new Bun.Glob("*.tgz").scan({ cwd: metaDir }))).sort().at(-1)
     if (!metaTgz) throw new Error("meta tarball missing")
-    await $`npm publish ${path.join(metaDir, metaTgz)} --access public --tag ${TAG}`.cwd(metaDir)
-    console.log(`published ${FORK}@${VERSION}`)
+    await publishTgz(path.join(metaDir, metaTgz), FORK, metaDir)
   }
 }
