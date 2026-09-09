@@ -1,8 +1,22 @@
 #!/usr/bin/env bun
-// Fork publisher: ships the opencode fork as `@autofab/swarmcode` on npm
+// Fork publisher: ships the opencode fork as `opencode` runtime identity on npm
 // with a drop-in `opencode` binary. Mirrors
-// packages/opencode/script/publish.ts but renames every published package
-// so nothing collides with upstream.
+// packages/opencode/script/publish.ts but publishes under a different org scope
+// so nothing collides with upstream, while the runtime keeps sharing upstream's
+// session and DB:
+//
+//   runtime identity (shared, never renamed):
+//     - binary name:            `opencode`
+//     - app dirs:               ~/.local/share/opencode, ~/.config/opencode, ...
+//     - session DB:             ~/.local/share/opencode/opencode.db (see
+//                               packages/core/src/database/database.ts —
+//                               intentionally no per-channel split)
+//     - auth/config:            auth.json, opencode.json(c) in those dirs
+//
+//   npm identity (org-scoped, no collision):
+//     - default FORK `@autofab/opencode` (+ `@autofab/opencode-<platform>-<arch>`
+//       binaries). Set FORK_NAME=opencode to publish unscoped when using a
+//       separate registry/org where that name is free.
 //
 // Usage:
 //   bun script/publish-swarmcode.ts pack      # after a build: rename dist
@@ -12,6 +26,7 @@
 //                                             # then assemble + publish meta
 //
 // Env:
+//   FORK_NAME     package name to publish (default @autofab/opencode)
 //   FORK_VERSION  version to publish (default 1.18.29-swarm.0)
 //   NPM_TAG       dist-tag (default latest)
 
@@ -22,7 +37,7 @@ import { fileURLToPath } from "url"
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
-const FORK = "@autofab/swarmcode"
+const FORK = process.env["FORK_NAME"] ?? "@autofab/opencode"
 const BIN = "opencode"
 const VERSION = process.env["FORK_VERSION"] ?? "1.18.29-swarm.0"
 const TAG = process.env["NPM_TAG"] ?? "latest"
@@ -57,6 +72,7 @@ async function publishTgz(tgz: string, name: string, cwd?: string) {
 
 function forkName(upstream: string) {
   if (!upstream.startsWith("opencode-")) throw new Error(`unexpected dist package: ${upstream}`)
+  if (!FORK.includes("/")) return upstream
   return FORK + upstream.slice("opencode".length)
 }
 
@@ -70,7 +86,10 @@ function stagedName(file: string) {
   const at = base.lastIndexOf(`-${VERSION}`)
   if (at <= 0) throw new Error(`cannot parse staged tarball: ${file}`)
   const safe = base.slice(0, at)
-  return safe.startsWith("autofab-") ? `@autofab/${safe.slice("autofab-".length)}` : safe
+  if (safe.startsWith("autofab-opencode-")) return `@autofab/${safe.slice("autofab-".length)}`
+  // legacy fork names still resolve so older staged tarballs keep working
+  if (safe.startsWith("autofab-")) return `@autofab/${safe.slice("autofab-".length)}`
+  return safe
 }
 
 if (mode === "pack") {
@@ -124,9 +143,12 @@ if (mode === "publish") {
   const upstreamPostinstall = await Bun.file(
     path.join(dir, "packages/opencode/script/postinstall.mjs"),
   ).text()
-  const postinstall = upstreamPostinstall
-    .replace("const base = `opencode-", "const base = `@autofab/swarmcode-")
-    .replace("opencode-install-", "swarmcode-install-")
+  // Keep the `opencode` runtime identity: unscoped FORK needs no rewrite,
+  // scoped FORK rewrites the binary base to the scoped name. The tmp install
+  // prefix stays `opencode-install-` so it never diverges from upstream.
+  const postinstall = FORK.includes("/")
+    ? upstreamPostinstall.replace("const base = `opencode-", `const base = \`${FORK}-`)
+    : upstreamPostinstall
   await Bun.file(path.join(metaDir, "postinstall.mjs")).write(postinstall)
   await Bun.file(path.join(metaDir, "LICENSE")).write(await Bun.file(path.join(dir, "LICENSE")).text())
   await Bun.file(path.join(metaDir, "bin", `${BIN}.exe`)).write(

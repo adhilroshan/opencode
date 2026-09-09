@@ -7,6 +7,9 @@ import { Flock } from "./util/flock"
 import { Flag } from "./flag/flag"
 import { makeGlobalNode } from "./effect/app-node"
 
+// Runtime identity shared with upstream on purpose: the swarm fork ships as
+// `opencode` (different npm/GitHub org, same binary/config/DB) so sessions,
+// auth, and ~/.local/share/opencode/opencode.db stay unified. Do not rename.
 const app = "opencode"
 const data = path.join(xdgData!, app)
 const cache = path.join(xdgCache!, app)
