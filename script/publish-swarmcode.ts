@@ -86,10 +86,12 @@ function stagedName(file: string) {
   const at = base.lastIndexOf(`-${VERSION}`)
   if (at <= 0) throw new Error(`cannot parse staged tarball: ${file}`)
   const safe = base.slice(0, at)
-  if (safe.startsWith("autofab-opencode-")) return `@autofab/${safe.slice("autofab-".length)}`
-  // legacy fork names still resolve so older staged tarballs keep working
-  if (safe.startsWith("autofab-")) return `@autofab/${safe.slice("autofab-".length)}`
-  return safe
+  // Scoped packages stage with "/" replaced by "-" (e.g.
+  // `@autofab/opencode-linux-x64` -> `@autofab-opencode-linux-x64`).
+  if (!safe.startsWith("@")) return safe
+  const dash = safe.indexOf("-", 1)
+  if (dash <= 1) throw new Error(`cannot parse staged tarball: ${file}`)
+  return `@${safe.slice(1, dash)}/${safe.slice(dash + 1)}`
 }
 
 if (mode === "pack") {
